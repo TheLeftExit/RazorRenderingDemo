@@ -1,0 +1,22 @@
+﻿@namespace RazorRenderingDemo
+@implements IRenderableComponent
+
+<p>
+    This component's @nameof(Id) is @Id, and its @nameof(Name) is @Name.
+</p>
+<div class="app" style="color: blue">
+    <span>9 + 10 = @(9+10+2)</span>
+</div>
+<p>
+    This component was designed using Visual Studio's built-in Razor editor, and rendered with its parameters added in code.
+</p>
+
+@code{
+    public int Id { get; set; }
+
+    public string? Name { get; set; }
+
+    public void Build(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder) {
+        this.BuildRenderTree(builder);
+    }
+}
