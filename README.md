@@ -6,6 +6,7 @@ The [**ComponentBase.BuildRenderTree**](https://docs.microsoft.com/en-us/dotnet/
 [**Program.cs**](Program.cs) renders a simple component with inlined properties and expressions to console.
 
 Notes:
- - It may be possible to do this in a more optimal way by somehow reusing the [**HtmlRenderer**](https://source.dot.net/#Microsoft.AspNetCore.Mvc.ViewFeatures/RazorComponents/HtmlRenderer.cs) class.
+ - ~~It may be possible to do this in a more optimal way by somehow reusing the [**HtmlRenderer**](https://source.dot.net/#Microsoft.AspNetCore.Mvc.ViewFeatures/RazorComponents/HtmlRenderer.cs) class.~~  
+The [HtmlRenderer.RenderComponentAsync](https://source.dot.net/#Microsoft.AspNetCore.Mvc.ViewFeatures/RazorComponents/HtmlRenderer.cs,97cbbf07350ec9ed) method throws unless it is called within the context of rendering a page while processing an HTTP request (or something), so reusing it is likely impossible and definitely less practical than rewriting its functionality from scratch.
  - Per Microsoft:
    > *Types in the Microsoft.AspNetCore.Components.RenderTree are not recommended for use outside of the Blazor framework. These types will change in future release.*
