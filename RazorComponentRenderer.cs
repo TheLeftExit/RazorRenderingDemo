@@ -1,48 +1,66 @@
-﻿using Microsoft.AspNetCore.Components.Rendering;
-using Microsoft.AspNetCore.Components.RenderTree;
+﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.HtmlRendering.Infrastructure;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace RazorRenderingDemo;
 
-#pragma warning disable BL0006 // Do not use RenderTree types
-public static class RazorComponentRenderer {
-    public static void Render(IRenderableComponent component, Action<string> write) {
-        using (var builder = new RenderTreeBuilder()) {
-            component.Build(builder);
-            var frames = builder.GetFrames();
+public static class RazorComponentRenderer
+{
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_passiveHtmlRenderer")]
+    private extern static ref StaticHtmlRenderer GetStaticHtmlRenderer(this HtmlRenderer htmlRenderer);
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "<Dispatcher>k__BackingField")]
+    private extern static ref Dispatcher GetDispatcher(this StaticHtmlRenderer staticHtmlRenderer);
 
-            // Very loosely based on:
-            // https://source.dot.net/#Microsoft.AspNetCore.Mvc.ViewFeatures/RazorComponents/HtmlRenderer.cs
-            // (could not be reused due to DI dependencies)
+    public static HtmlRenderer HtmlRendererPatched { get; }
 
-            bool isInElement = false;
-            Stack<(string Name, int EndPosition)> elementStack = new();
-
-            foreach (var frame in frames.Array.Take(frames.Count)) {
-                if (isInElement && frame.FrameType != RenderTreeFrameType.Attribute) {
-                    write(">");
-                    isInElement = false;
-                }
-
-                switch (frame.FrameType) {
-                    case RenderTreeFrameType.Text:
-                    case RenderTreeFrameType.Markup:
-                        write(frame.TextContent);
-                        break;
-                    case RenderTreeFrameType.Element:
-                        write($"<{frame.TextContent}");
-                        isInElement = true;
-                        elementStack.Push((frame.ElementName, frame.Sequence + frame.ElementSubtreeLength - 1));
-                        break;
-                    case RenderTreeFrameType.Attribute:
-                        write($" {frame.AttributeName}=\"{frame.AttributeValue}\"");
-                        break;
-                }
-
-                while (elementStack.TryPeek(out var result) && result.EndPosition == frame.Sequence) {
-                    Console.Write($"</{elementStack.Pop().Name}>");
-                }
-            }
-
-        }
+    static RazorComponentRenderer()
+    {
+        HtmlRendererPatched = new HtmlRenderer(new DummyServiceProvider(), NullLoggerFactory.Instance);
+        HtmlRendererPatched.GetStaticHtmlRenderer().GetDispatcher() = new DummyDispatcher();
     }
+
+    public static async Task<string> RenderAsync<T>(this T component, IDictionary<string, object?>? parameters = null) where T : ComponentBase
+    {
+        parameters ??= typeof(T).GetProperties()
+            .Where(x => x.GetCustomAttribute<ParameterAttribute>() != null)
+            .ToDictionary(x => x.Name, x => x.GetValue(component));
+        var parameterView = ParameterView.FromDictionary(parameters);
+        var htmlRootElement = await HtmlRendererPatched.RenderComponentAsync<T>(parameterView);
+        return htmlRootElement.ToHtmlString();
+    }
+
+    private class DummyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => null;
+    }
+
+    private class DummyDispatcher : Dispatcher
+    {
+        public override bool CheckAccess() => true;
+        public override Task InvokeAsync(Action workItem) => new(workItem);
+        public override Task InvokeAsync(Func<Task> workItem) => workItem();
+        public override Task<TResult> InvokeAsync<TResult>(Func<TResult> workItem) => new(workItem);
+        public override Task<TResult> InvokeAsync<TResult>(Func<Task<TResult>> workItem) => workItem();
+    }
+
+
+    // Alternative approach - extract the context, assign it to the current thread.
+    // More intrusive to the calling application, cannot be used with UnsafeAccessor.
+
+    /*
+    public static async Task<string> RenderViaSyncContextExtraction(this ComponentBase component)
+    {
+        var htmlRenderer = new HtmlRenderer(new DummyServiceProvider(), NullLoggerFactory.Instance);
+
+        var dispatcher = htmlRenderer.Dispatcher;
+        var syncContext = (SynchronizationContext)dispatcher.GetType().GetField("_context", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dispatcher)!;
+        SynchronizationContext.SetSynchronizationContext(syncContext);
+
+        var htmlRootElement = await htmlRenderer.RenderComponentAsync<Component1>().ConfigureAwait(false);
+        return htmlRootElement.ToHtmlString();
+    }
+    */
 }

@@ -1,7 +1,4 @@
-﻿@namespace RazorRenderingDemo
-@implements IRenderableComponent
-
-<p>
+﻿<p>
     This component's @nameof(Id) is @Id, and its @nameof(Name) is @Name.
 </p>
 <div class="app" style="color: blue">
@@ -12,11 +9,8 @@
 </p>
 
 @code{
+    [Parameter]
     public int Id { get; set; }
-
+    [Parameter]
     public string? Name { get; set; }
-
-    public void Build(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder) {
-        this.BuildRenderTree(builder);
-    }
 }

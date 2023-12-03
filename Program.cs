@@ -1,13 +1,9 @@
-namespace RazorRenderingDemo;
+using RazorRenderingDemo;
 
-class Program {
-    static void Main() {
-        var index = new Index() {
-            Name = "SampleName",
-            Id = 0
-        };
+var component = new MyComponent() {
+    Name = "SampleName",
+    Id = 0
+};
 
-        RazorComponentRenderer.Render(index, Console.Write);
-        Console.ReadKey();
-    }
-}
+Console.WriteLine(await component.RenderAsync());
+Console.ReadKey();
